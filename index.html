@@ -2885,119 +2885,101 @@ function copyResult(id) {
   });
 }
 
-function printPDF(id) {
+// ── PDF 공통 헬퍼: 척도 콘텐츠를 독립 HTML로 빌드 ──
+function buildClinPdfHTML(id) {
   const ptNum = document.getElementById('ptNum').value || '환자번호';
-  const date = document.getElementById('ptDate').value || '날짜';
-  const scale = CLIN_SCALES[id];
-  const filename = scale.pdfFmt(ptNum, date);
-  const origTitle = document.title;
-
-  // Populate print info bar
-  const bar = document.getElementById('printInfoBar');
-  if(bar) {
-    const left = document.getElementById('printInfoLeft');
-    const right = document.getElementById('printInfoRight');
-    if(left) left.textContent = `환자번호: ${ptNum}   검사날짜: ${date}`;
-    if(right) right.textContent = filename;
-  }
-
-  document.title = filename;
-  showToast(`PDF 파일명: ${filename}\n(브라우저 인쇄 → PDF로 저장)`);
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => { document.title = origTitle; }, 1000);
-  }, 800);
-}
-
-function savePDF(id) {
-  const ptNum = document.getElementById('ptNum').value || '환자번호';
-  const date = document.getElementById('ptDate').value || '날짜';
+  const date  = document.getElementById('ptDate').value  || '날짜';
   const scale = CLIN_SCALES[id];
   const filename = scale.pdfFmt(ptNum, date);
 
-  // Clone the main content area
   const mainEl = document.getElementById('mainContent');
-  if(!mainEl) { showToast('콘텐츠를 찾을 수 없습니다.'); return; }
+  if(!mainEl) { showToast('콘텐츠를 찾을 수 없습니다.'); return null; }
   const clone = mainEl.cloneNode(true);
-  clone.querySelectorAll('.clin-score-actions, #printInfoBar').forEach(el => el.remove());
+  clone.querySelectorAll('.clin-score-actions, #printInfoBar, button').forEach(el => el.remove());
 
-  // 최소 필수 CSS만 인라인으로 직접 작성 (페이지 전체 CSS 금지)
-  const minCSS = `
+  const css = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#1a1f36;padding:18px 22px;font-size:13px;}
 .print-hdr{display:flex;justify-content:space-between;font-size:11px;color:#555;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:14px;}
-/* scale header */
 .clin-scale-header{margin-bottom:12px;}
 .clin-scale-title{font-size:16px;font-weight:700;margin-bottom:2px;}
 .clin-scale-meta{font-size:11px;color:#555;}
-/* item cards */
 .clin-item-card{background:#fff;border:1px solid #d0d6e8;border-radius:7px;margin-bottom:5px;overflow:hidden;}
-.clin-item-card.scored{border-color:rgba(37,99,235,0.4);}
-.clin-item-header{padding:7px 12px 4px;font-size:11.5px;font-weight:500;color:#1a1f36;}
-.clin-item-num{display:inline-block;width:17px;height:17px;background:#f0f2f8;border-radius:50%;text-align:center;line-height:17px;font-size:9px;color:#6b7280;margin-right:5px;}
+.clin-item-card.scored{border-color:rgba(37,99,235,0.35);}
+.clin-item-header{padding:7px 12px 4px;font-size:11px;font-weight:500;}
+.clin-item-num{display:inline-block;width:16px;height:16px;background:#f0f2f8;border-radius:50%;text-align:center;line-height:16px;font-size:9px;color:#6b7280;margin-right:5px;}
 .clin-item-card.scored .clin-item-num{background:rgba(37,99,235,0.18);color:#2563eb;}
-/* option buttons */
-.clin-options{padding:2px 10px 7px;display:flex;flex-direction:column;gap:3px;}
-.clin-opt-btn{background:transparent;border:1px solid #d0d6e8;color:#4a5278;padding:4px 9px;border-radius:5px;text-align:left;font-size:10.5px;font-family:inherit;line-height:1.4;display:flex;align-items:flex-start;gap:7px;}
-.clin-opt-btn.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;font-weight:600;}
-.clin-opt-score{min-width:15px;height:15px;border-radius:50%;background:#f0f2f8;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0;margin-top:1px;}
+.clin-options{padding:2px 10px 7px;display:flex;flex-direction:column;gap:2px;}
+.clin-opt-btn{background:transparent;border:1px solid #d0d6e8;color:#4a5278;padding:3px 9px;border-radius:5px;text-align:left;font-size:10px;font-family:inherit;line-height:1.4;display:flex;align-items:flex-start;gap:6px;}
+.clin-opt-btn.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;font-weight:700;}
+.clin-opt-score{min-width:15px;height:15px;border-radius:50%;background:#f0f2f8;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0;margin-top:1px;}
 .clin-opt-btn.selected .clin-opt-score{background:#2563eb;color:#fff;}
-/* chip style (BPRS) */
-.clin-options-row{padding:2px 10px 7px;display:flex;gap:4px;flex-wrap:wrap;}
-.clin-opt-chip{background:#f0f2f8;border:1px solid #d0d6e8;color:#4a5278;padding:4px 9px;border-radius:14px;font-size:10px;font-family:inherit;}
-.clin-opt-chip.selected{background:rgba(37,99,235,0.15);border-color:#2563eb;color:#2563eb;font-weight:600;}
-/* number input items */
-.clin-item-input{padding:3px 14px 10px;display:flex;align-items:center;gap:10px;}
-.clin-num-input{background:#f0f2f8;border:1px solid #d0d6e8;color:#1a1f36;padding:6px 10px;border-radius:6px;font-size:13px;width:80px;text-align:center;}
-/* score footer */
+.clin-options-row{padding:2px 10px 7px;display:flex;gap:3px;flex-wrap:wrap;}
+.clin-opt-chip{background:#f0f2f8;border:1px solid #d0d6e8;color:#4a5278;padding:3px 9px;border-radius:14px;font-size:10px;font-family:inherit;}
+.clin-opt-chip.selected{background:rgba(37,99,235,0.15);border-color:#2563eb;color:#2563eb;font-weight:700;}
+.clin-item-input{padding:3px 14px 8px;display:flex;align-items:center;gap:8px;}
+.clin-num-input{background:#f0f2f8;border:1px solid #d0d6e8;padding:5px 9px;border-radius:5px;font-size:12px;width:75px;text-align:center;}
 .clin-score-footer{background:#fff;border:1px solid #d0d6e8;border-radius:9px;padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .clin-score-big{font-size:28px;font-weight:700;color:#2563eb;line-height:1;}
 .clin-score-interp{font-size:13px;color:#4a5278;}
 .clin-score-interp strong{color:#1a1f36;font-size:13px;}
-/* sub-scores (BPRS) */
+.clin-score-actions{display:none!important;}
 .clin-sub-scores{background:#f0f2f8;border:1px solid #d0d6e8;border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;gap:3px;font-size:10px;color:#4a5278;flex:1;}
 .clin-sub-item{display:flex;justify-content:space-between;gap:8px;}
 .clin-sub-val{font-weight:700;color:#1a1f36;}
-/* PSQI comps */
 .clin-psqi-comps{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
 .clin-psqi-comp{background:#f0f2f8;border:1px solid #d0d6e8;border-radius:5px;padding:5px 8px;text-align:center;min-width:65px;}
 .clin-psqi-comp-val{font-size:14px;font-weight:700;color:#2563eb;}
 .clin-psqi-comp-name{font-size:9px;color:#6b7280;margin-top:1px;}
-/* GDS */
 .clin-gds-options{padding:2px 10px 7px;display:flex;flex-direction:column;gap:3px;}
 .clin-gds-opt{background:#f0f2f8;border:1px solid #d0d6e8;color:#4a5278;padding:7px 10px;border-radius:7px;text-align:left;font-size:10px;line-height:1.5;}
-.clin-gds-opt.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;}
-.clin-gds-stage{font-size:10px;font-weight:600;display:block;margin-bottom:1px;}
-/* MMSE */
-.clin-scale-header + div{margin-bottom:12px;}
-/* hide buttons */
-.clin-score-actions{display:none!important;}
-button{display:none!important;}
-@media print{
-  @page{size:A4 portrait;margin:10mm 12mm;}
-  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-  body{padding:0;}
-}`;
+.clin-gds-opt.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;font-weight:700;}
+.clin-gds-stage{font-size:10px;font-weight:700;display:block;margin-bottom:1px;}
+@media print{@page{size:A4 portrait;margin:10mm 12mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{padding:0;}}`;
 
-  const scriptTag = '<scr'+'ipt>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},1200);};</'+'script>';
-  const html = `<!DOCTYPE html>
-<html lang="ko"><head><meta charset="UTF-8"><title>${filename}</title>
-<style>${minCSS}</style></head>
-<body>
-<div class="print-hdr">
-  <span>환자번호: ${ptNum} &nbsp; 검사날짜: ${date}</span>
-  <span style="font-weight:700">${filename}</span>
-</div>
-${clone.outerHTML}
-</body></html>` + scriptTag;
+  const body = `<div class="print-hdr"><span>환자번호: ${ptNum} &nbsp; 검사날짜: ${date}</span><span style="font-weight:700">${filename}</span></div>${clone.outerHTML}`;
 
-  const win = window.open('', '_blank', 'width=860,height=900');
-  if(!win) { showToast('팝업 차단을 해제해 주세요.'); return; }
-  win.document.write(html);
-  win.document.close();
-  win.document.title = filename;
+  return { ptNum, date, filename, css, body };
 }
+
+// 팝업 없이 Blob URL → hidden iframe으로 인쇄
+function printPDF(id) {
+  const d = buildClinPdfHTML(id);
+  if(!d) return;
+  const scr = '<scr'+'ipt>window.onload=function(){window.focus();window.print();};</'+'script>';
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${d.filename}</title><style>${d.css}</style></head><body>${d.body}</body></html>${scr}`;
+  _openPrintFrame(html, d.filename);
+}
+
+// 바로저장: Blob URL → 새 탭 (팝업 차단 없음)
+function savePDF(id) {
+  const d = buildClinPdfHTML(id);
+  if(!d) return;
+  const scr = '<scr'+'ipt>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},2000);};</'+'script>';
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${d.filename}</title><style>${d.css}</style></head><body>${d.body}</body></html>${scr}`;
+  _openPrintFrame(html, d.filename);
+}
+
+function _openPrintFrame(html, filename) {
+  // Blob URL 방식 — 현재 페이지와 완전히 분리된 새 탭
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href   = url;
+    a.target = '_blank';
+    a.rel    = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast(`📄 새 탭에서 인쇄 다이얼로그가 열립니다. (파일명: ${filename})`);
+  } catch(e) {
+    showToast('PDF 생성 실패: ' + e.message);
+  }
+}
+
 
 function resetAllClin() {
   if(!confirm('모든 검사 결과를 초기화하시겠습니까?')) return;

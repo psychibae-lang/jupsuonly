@@ -2895,7 +2895,59 @@ function buildClinPdfHTML(id) {
   const mainEl = document.getElementById('mainContent');
   if(!mainEl) { showToast('콘텐츠를 찾을 수 없습니다.'); return null; }
   const clone = mainEl.cloneNode(true);
-  clone.querySelectorAll('.clin-score-actions, #printInfoBar, button').forEach(el => el.remove());
+
+  // ── 선택 항목을 텍스트로 변환하고 나머지 제거 ──
+  // 1) 일반 opt-btn: 선택된 것 텍스트로, 나머지 제거
+  clone.querySelectorAll('.clin-options, .clin-options-row, .clin-gds-options').forEach(container => {
+    const selected = container.querySelector('.selected');
+    if (selected) {
+      // 선택된 항목의 텍스트만 추출
+      const scoreEl = selected.querySelector('.clin-opt-score');
+      const scoreText = scoreEl ? scoreEl.textContent.trim() : '';
+      // 전체 텍스트에서 점수 부분 제거
+      let label = '';
+      selected.childNodes.forEach(node => {
+        if (node !== scoreEl && node.nodeType === Node.TEXT_NODE) label += node.textContent;
+        else if (node !== scoreEl && node.nodeType === Node.ELEMENT_NODE) label += node.textContent;
+      });
+      label = label.trim();
+      const answer = scoreText ? `[${scoreText}점] ${label}` : label;
+      const div = document.createElement('div');
+      div.className = 'pdf-answer';
+      div.textContent = answer;
+      container.parentNode.replaceChild(div, container);
+    } else {
+      // 미선택 → 빈 표시
+      const div = document.createElement('div');
+      div.className = 'pdf-answer pdf-no-answer';
+      div.textContent = '(미입력)';
+      container.parentNode.replaceChild(div, container);
+    }
+  });
+
+  // 2) 숫자 입력 (WHODAS 등): input value 텍스트로
+  clone.querySelectorAll('.clin-item-input').forEach(container => {
+    const input = container.querySelector('input');
+    const unit  = container.querySelector('span');
+    const val   = input ? input.value : '';
+    const unitTxt = unit ? unit.textContent.trim() : '';
+    const div = document.createElement('div');
+    div.className = 'pdf-answer';
+    div.textContent = val ? `${val} ${unitTxt}` : '(미입력)';
+    container.parentNode.replaceChild(div, container);
+  });
+
+  // 3) PSQI 숫자 입력 (q1~q4)
+  clone.querySelectorAll('.clin-num-input').forEach(input => {
+    const val = input.value;
+    const span = document.createElement('span');
+    span.className = 'pdf-answer';
+    span.textContent = val || '(미입력)';
+    input.parentNode.replaceChild(span, input);
+  });
+
+  // 4) 나머지 버튼/액션 제거
+  clone.querySelectorAll('.clin-score-actions, #printInfoBar').forEach(el => el.remove());
 
   const css = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -2904,38 +2956,38 @@ body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#1a1f36;padding
 .print-hdr{display:flex;justify-content:space-between;font-size:11px;color:#555;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:14px;}
 .clin-scale-header{margin-bottom:12px;}
 .clin-scale-title{font-size:16px;font-weight:700;margin-bottom:2px;}
-.clin-scale-meta{font-size:11px;color:#555;}
-.clin-item-card{background:#fff;border:1px solid #d0d6e8;border-radius:7px;margin-bottom:5px;overflow:hidden;}
-.clin-item-card.scored{border-color:rgba(37,99,235,0.35);}
-.clin-item-header{padding:7px 12px 4px;font-size:11px;font-weight:500;}
-.clin-item-num{display:inline-block;width:16px;height:16px;background:#f0f2f8;border-radius:50%;text-align:center;line-height:16px;font-size:9px;color:#6b7280;margin-right:5px;}
-.clin-item-card.scored .clin-item-num{background:rgba(37,99,235,0.18);color:#2563eb;}
-.clin-options{padding:2px 10px 7px;display:flex;flex-direction:column;gap:2px;}
-.clin-opt-btn{background:transparent;border:1px solid #d0d6e8;color:#4a5278;padding:3px 9px;border-radius:5px;text-align:left;font-size:10px;font-family:inherit;line-height:1.4;display:flex;align-items:flex-start;gap:6px;}
-.clin-opt-btn.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;font-weight:700;}
-.clin-opt-score{min-width:15px;height:15px;border-radius:50%;background:#f0f2f8;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0;margin-top:1px;}
-.clin-opt-btn.selected .clin-opt-score{background:#2563eb;color:#fff;}
-.clin-options-row{padding:2px 10px 7px;display:flex;gap:3px;flex-wrap:wrap;}
-.clin-opt-chip{background:#f0f2f8;border:1px solid #d0d6e8;color:#4a5278;padding:3px 9px;border-radius:14px;font-size:10px;font-family:inherit;}
-.clin-opt-chip.selected{background:rgba(37,99,235,0.15);border-color:#2563eb;color:#2563eb;font-weight:700;}
-.clin-item-input{padding:3px 14px 8px;display:flex;align-items:center;gap:8px;}
-.clin-num-input{background:#f0f2f8;border:1px solid #d0d6e8;padding:5px 9px;border-radius:5px;font-size:12px;width:75px;text-align:center;}
-.clin-score-footer{background:#fff;border:1px solid #d0d6e8;border-radius:9px;padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.clin-score-big{font-size:28px;font-weight:700;color:#2563eb;line-height:1;}
+.clin-scale-meta{font-size:11px;color:#666;margin-bottom:4px;}
+.clin-item-card{background:#fff;border:1px solid #d0d6e8;border-radius:7px;margin-bottom:4px;overflow:hidden;}
+.clin-item-card.scored{border-left:3px solid #2563eb;}
+.clin-item-header{padding:6px 12px 3px;font-size:11px;font-weight:600;color:#1a1f36;}
+.clin-item-num{display:inline-block;width:16px;height:16px;background:#e8edf8;border-radius:50%;text-align:center;line-height:16px;font-size:9px;color:#2563eb;margin-right:5px;font-weight:700;}
+/* 선택된 답변 텍스트 */
+.pdf-answer{padding:4px 14px 8px;font-size:11px;color:#1a1f36;font-weight:600;}
+.pdf-no-answer{color:#aaa;font-weight:400;font-style:italic;}
+/* 점수 footer */
+.clin-score-footer{background:#f0f4ff;border:1.5px solid #2563eb;border-radius:9px;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.clin-score-big{font-size:30px;font-weight:800;color:#2563eb;line-height:1;}
 .clin-score-interp{font-size:13px;color:#4a5278;}
-.clin-score-interp strong{color:#1a1f36;font-size:13px;}
+.clin-score-interp strong{color:#1a1f36;font-size:14px;font-weight:700;}
 .clin-score-actions{display:none!important;}
+/* BPRS sub-scores */
 .clin-sub-scores{background:#f0f2f8;border:1px solid #d0d6e8;border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;gap:3px;font-size:10px;color:#4a5278;flex:1;}
 .clin-sub-item{display:flex;justify-content:space-between;gap:8px;}
 .clin-sub-val{font-weight:700;color:#1a1f36;}
+/* PSQI comps */
 .clin-psqi-comps{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
 .clin-psqi-comp{background:#f0f2f8;border:1px solid #d0d6e8;border-radius:5px;padding:5px 8px;text-align:center;min-width:65px;}
 .clin-psqi-comp-val{font-size:14px;font-weight:700;color:#2563eb;}
 .clin-psqi-comp-name{font-size:9px;color:#6b7280;margin-top:1px;}
-.clin-gds-options{padding:2px 10px 7px;display:flex;flex-direction:column;gap:3px;}
-.clin-gds-opt{background:#f0f2f8;border:1px solid #d0d6e8;color:#4a5278;padding:7px 10px;border-radius:7px;text-align:left;font-size:10px;line-height:1.5;}
-.clin-gds-opt.selected{background:rgba(37,99,235,0.1);border-color:#2563eb;color:#1a1f36;font-weight:700;}
+/* GDS */
 .clin-gds-stage{font-size:10px;font-weight:700;display:block;margin-bottom:1px;}
+/* 숫자 입력 표시 */
+.pdf-answer.pdf-answer{display:block;}
+/* PSQI item-input wrapper */
+.clin-item-input .pdf-answer{padding:4px 0 6px;}
+/* hide all buttons */
+button{display:none!important;}
+input{display:none!important;}
 @media print{@page{size:A4 portrait;margin:10mm 12mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{padding:0;}}`;
 
   const body = `<div class="print-hdr"><span>환자번호: ${ptNum} &nbsp; 검사날짜: ${date}</span><span style="font-weight:700">${filename}</span></div>${clone.outerHTML}`;
